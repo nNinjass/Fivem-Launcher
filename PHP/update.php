@@ -5,7 +5,6 @@ require 'ayarlar.php';
 ?>{
 	"version": "<?=$exe_version?>", 
 	"update_file": "<?=$update_file?>",
-	"server": "<?=$fivem_server?>", 
 	"discord": "<?=$discord?>", 
 	"teamspeak3": "<?=$teamspeak3?>", 
 	"cheats": [

@@ -68,6 +68,17 @@ namespace Launcher.Managers
                 return 0;
             }
         }
+
+        public static void ClearFivemCache()
+        {
+            var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var fivemCacheFolder = $"{localAppData}\\FiveM\\FiveM.app\\cache\\priv";
+
+            if (Directory.Exists(fivemCacheFolder))
+            {
+                Directory.Delete(fivemCacheFolder, true);
+            }
+        }
     }
 
     public partial class FivemApi

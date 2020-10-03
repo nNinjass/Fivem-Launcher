@@ -17,6 +17,13 @@
                 </Style>
             </Button.Resources>
         </Button>
+        <Button x:Name="BtnClearCache" Content="Fivem Cache Sil" HorizontalAlignment="Left" Height="34" Margin="623,12,0,0" VerticalAlignment="Top" Width="119" Click="BtnClearCache_Click" FontWeight="Bold" BorderBrush="White">
+            <Button.Resources>
+                <Style TargetType="{x:Type Border}">
+                    <Setter Property="CornerRadius" Value="5"/>
+                </Style>
+            </Button.Resources>
+        </Button>
         <Button x:Name="BtnTeamspeak" Content="Teamspeak" HorizontalAlignment="Left" Height="34" Margin="660,279,0,0" VerticalAlignment="Top" Width="119" Click="btnTeamspeak_Click" FontWeight="Bold" BorderBrush="White" Visibility="Collapsed">
             <Button.Resources>
                 <Style TargetType="{x:Type Border}">
@@ -53,6 +60,16 @@
                             </ControlTemplate>
                         </Setter.Value>
                     </Setter>
+                </Style>
+            </Button.Resources>
+        </Button>
+
+        <Label x:Name="lblNews" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,60,-0.2,0" Height="211" Width="797" Foreground="White" FontSize="14" FontWeight="Bold" Background="#33000000"/>
+
+        <Button x:Name="BtnCopyMapFiles" Content="3D Harita Kopyala" HorizontalAlignment="Left" Height="34" Margin="500,12,0,0" VerticalAlignment="Top" Width="119" Click="BtnCopyMapFiles_Click" FontWeight="Bold" BorderBrush="White">
+            <Button.Resources>
+                <Style TargetType="{x:Type Border}">
+                    <Setter Property="CornerRadius" Value="5"/>
                 </Style>
             </Button.Resources>
         </Button>

@@ -21,18 +21,23 @@ namespace Launcher
     /// </summary>
     public partial class MainWindow : Window
     {
-        private const string LauncherUpdateURL = "https://yalc.in/fivem_launcher/update.php";
-        private const string ServerUpdateURL = "https://yalc.in/fivem_launcher/guncelle.php";
-        private const string ServerCheckURL = "https://yalc.in/fivem_launcher/kontrol.php";
-        private const string SteamProxyURL = "https://yalc.in/fivem_launcher/steamProxy.php";
-        private const string ServerOnlineURL = "https://yalc.in/fivem_launcher/online.php";
+        private const string ServerURL = "https://yalc.in/fivem_launcher/"; // KENDİ SUNUCUNUZA GÖRE DEĞİŞTİRİN
+        private const string SteamProxyURL = "https://yalc.in/fivem_launcher/steamProxy.php"; // KENDİ SUNUCUNUZA GÖRE DEĞİŞTİRİN
+        private const string UpdateEndpoint = "update.php"; // server değişkenlerinin olduğu php
+        private const string LaunchEndpoint = "gir.php"; // launch butonuna basılınca çalışan php
+        private const string StatusUpdateEndpoint = "guncelle.php"; // steam hex status veritabınına işleyen php
+        private const string StatusCheckEndpoint = "kontrol.php"; // oyuncunun servera bağlı olup olmadığını kontrol eden php
+        private const string OnlinePlayersEndpoint = "online.php"; // online oyuncu sayısını veren php
+        private const string NewsEndpoint = "news.php"; // duyurular & haberlerin olduğu php
+
         private const string MessageTitle = "GormYa Launcher";
 
         private string _steamHex;
         private UpdateObject _globalVariables;
-        private readonly bool _isLocal;
         private bool _steamYeniAcildi;
 
+        private readonly DispatcherTimer _timerFivemOpenControl = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5), IsEnabled = false }; // fivem açılışını kontrol et
+        private readonly DispatcherTimer _timerFivemCloseControl = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5), IsEnabled = false }; // fivemn kapanışını kontrol et
         private readonly DispatcherTimer _timerCheats = new DispatcherTimer { Interval = TimeSpan.FromSeconds(60), IsEnabled = false }; // 60 saniyede bir hile korumasını çalıştır
         private readonly DispatcherTimer _timerSetOnline = new DispatcherTimer { Interval = TimeSpan.FromSeconds(25), IsEnabled = false }; // 25 saniyede bir sunucudaki oyuncunun giriş tarihini güncelle
         private readonly DispatcherTimer _timerGetOnlinePlayers = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10), IsEnabled = false }; // 10 saniyede bir sunucudaki oyuncunun giriş tarihini güncelle
@@ -41,12 +46,6 @@ namespace Launcher
 
         public MainWindow()
         {
-            var args = Environment.GetCommandLineArgs();
-            if (args.Length > 1 && args[1].Equals("-local"))
-            {
-                _isLocal = true;
-            }
-
             InitializeComponent();
         }
 
@@ -59,27 +58,14 @@ namespace Launcher
         {
             var args = Environment.GetCommandLineArgs();
 
-            if (LauncherManager.IsAdministrator())
-            {
-                if (args.Any(a => a.Equals("-user")))
-                {
-                    ShowError("Launcher yönetici olarak çalışamaz. Kullanıcı hakları ile tekrardan çalıştır. UAC devre dışı ise, UAC açmalısın. Hiç UAC kapatılır mı, virüs bulaşır sonra :)");
-                }
-                else
-                {
-                    LauncherManager.RunAsNormalUser(Assembly.GetExecutingAssembly().Location);
-                }
-
-                Process.GetCurrentProcess().KillGorm();
-                return;
-            }
-
             FivemManager.KillFivem();
 
             if (args.Any(a => a.Equals("-updated")))
             {
                 ShowInformation("Launcher güncellendi!");
 
+                _timerFivemOpenControl.Tick += FivemOpenControl;
+                _timerFivemCloseControl.Tick += FivemCloseControl;
                 _timerCheats.Tick += CloseCheats;
                 _timerSetOnline.Tick += SetOnline;
                 _timerGetOnlinePlayers.Tick += GetOnlinePlayers;
@@ -88,11 +74,49 @@ namespace Launcher
             }
             else
             {
+                _timerFivemOpenControl.Tick += FivemOpenControl;
+                _timerFivemCloseControl.Tick += FivemCloseControl;
                 _timerCheats.Tick += CloseCheats;
                 _timerSetOnline.Tick += SetOnline;
                 _timerGetOnlinePlayers.Tick += GetOnlinePlayers;
 
                 Task.Run(UpdateControl);
+            }
+        }
+
+        private int openControlCounter;
+        private void FivemOpenControl(object sender, EventArgs e)
+        {
+            var process = Process.GetProcessesByName("fivem").FirstOrDefault();
+            if (process != null)
+            {
+                _timerCheats.Stop();
+                _timerCheats.Interval = new TimeSpan(0, 0, 0, 61);
+                _timerCheats.Start();
+
+                _timerFivemOpenControl.Stop();
+                _timerFivemCloseControl.Start();
+            }
+            else
+            {
+                if (openControlCounter == 12)
+                {
+                    openControlCounter = 0;
+                    FivemStopped();
+                }
+                else
+                {
+                    openControlCounter++;
+                }
+            }
+        }
+
+        private void FivemCloseControl(object sender, EventArgs e)
+        {
+            var process = Process.GetProcessesByName("fivem").FirstOrDefault();
+            if (process == null)
+            {
+                FivemStopped();
             }
         }
 
@@ -175,7 +199,7 @@ namespace Launcher
         {
             var exePath = Assembly.GetExecutingAssembly().Location;
 
-            var updater = new UpdateManager(LauncherUpdateURL, exePath);
+            var updater = new UpdateManager($"{ServerURL}{UpdateEndpoint}", exePath);
             _globalVariables = await updater.CheckUpdate();
 
             if (_globalVariables == null)
@@ -193,7 +217,7 @@ namespace Launcher
             var currentVersion = Assembly.GetExecutingAssembly().GetName().Version.ToString();
             var exePath = Assembly.GetExecutingAssembly().Location;
 
-            var updater = new UpdateManager(LauncherUpdateURL, exePath);
+            var updater = new UpdateManager($"{ServerURL}{UpdateEndpoint}", exePath);
 
             _globalVariables = await updater.CheckUpdate();
 
@@ -226,9 +250,9 @@ namespace Launcher
         {
             if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(UpdateKontrolEdildi); return; }
 
-            Visibility = Visibility.Visible;
+            lblNews.Content = LauncherManager.GetNews($"{ServerURL}{NewsEndpoint}");
 
-            Copy3DMapFiles(); // 3D haritayı fivem klasörüne kopyala
+            Visibility = Visibility.Visible;
 
             GetSteamHex().ContinueWith(RenderUI); // Butonların ve online sayısının görünürlüğünü ayarla
 
@@ -258,11 +282,7 @@ namespace Launcher
 
             LblOnline.Visibility = Visibility.Visible;
 
-            // Server boş değilse butonunu göster
-            if (!string.IsNullOrEmpty(_globalVariables?.Server))
-            {
-                BtnLaunch.Visibility = Visibility.Visible;
-            }
+            BtnLaunch.Visibility = Visibility.Visible;
         }
 
         private async Task<string> GetSteamHex()
@@ -373,7 +393,8 @@ namespace Launcher
                 {
                     if (!string.IsNullOrEmpty(_steamHex))
                     {
-                        var task = LauncherAPIManager.ReportCheat(ServerUpdateURL, _steamHex, string.Join("; ", killedProcess));
+                        // ReSharper disable once UnusedVariable
+                        var reportCheat = LauncherAPIManager.ReportCheat($"{ServerURL}{StatusUpdateEndpoint}", _steamHex, string.Join("; ", killedProcess));
                     }
 
                     FivemManager.KillFivem();
@@ -384,7 +405,8 @@ namespace Launcher
                 {
                     if (!string.IsNullOrEmpty(_steamHex))
                     {
-                        var task = LauncherAPIManager.ReportCheat(ServerUpdateURL, _steamHex, "Access Denied");
+                        // ReSharper disable once UnusedVariable
+                        var reportCheat = LauncherAPIManager.ReportCheat($"{ServerURL}{StatusUpdateEndpoint}", _steamHex, "Access Denied");
                     }
 
                     FivemManager.KillFivem();
@@ -397,7 +419,7 @@ namespace Launcher
         private void SetOnline(object sender, EventArgs e)
         {
             // Oyundan disconnect olmuş mu kontrol et, disconnect olmamışsa son girişi güncelle
-            Task.Run(() => LauncherAPIManager.GetStatus(ServerCheckURL, _steamHex)).ContinueWith(getTask =>
+            Task.Run(() => LauncherAPIManager.GetStatus($"{ServerURL}{StatusCheckEndpoint}", _steamHex)).ContinueWith(getTask =>
             {
                 var status = getTask.Result;
 
@@ -405,12 +427,13 @@ namespace Launcher
 
                 if (status == "-4")
                 {
-                    var task = LauncherAPIManager.SetStatus(ServerUpdateURL, _steamHex, "0");
                     FivemManager.KillFivem();
+                    FivemStopped();
                 }
                 else
                 {
-                    var task = LauncherAPIManager.SetStatus(ServerUpdateURL, _steamHex, status);
+                    // ReSharper disable once UnusedVariable
+                    var task = LauncherAPIManager.SetStatus($"{ServerURL}{StatusUpdateEndpoint}", _steamHex, status);
                 }
             });
         }
@@ -425,7 +448,7 @@ namespace Launcher
                     using (var webClient = new WebClient())
                     {
                         webClient
-                            .DownloadStringTaskAsync(new Uri(ServerOnlineURL))
+                            .DownloadStringTaskAsync(new Uri($"{ServerURL}{OnlinePlayersEndpoint}"))
                             .ContinueWith(task => { Dispatcher.Invoke(delegate { LblOnline.Content = $"Online: {task.Result}"; }); });
                     }
                 }
@@ -455,7 +478,7 @@ namespace Launcher
         {
             FivemManager.KillFivem();
 
-            Task.Run(() => LauncherAPIManager.SetStatus(ServerUpdateURL, _steamHex, "1")).ContinueWith(task =>
+            Task.Run(() => LauncherAPIManager.SetStatus($"{ServerURL}{StatusUpdateEndpoint}", _steamHex, "1")).ContinueWith(task =>
             {
                 switch (task.Result)
                 {
@@ -497,28 +520,24 @@ namespace Launcher
 
             if (_timerGetOnlinePlayers.IsEnabled) _timerGetOnlinePlayers.Stop();
 
-            Task.Run(() =>
-            {
-                var process = Process.Start($"fivem://connect/{(_isLocal ? "localhost:30120" : _globalVariables.Server)}", "-gormya");
-                if (process == null) return;
-
-                _timerCheats.Stop();
-                _timerCheats.Interval = new TimeSpan(0, 0, 0, 61);
-                _timerCheats.Start();
-                process.WaitForExit();
-            }).ContinueWith(FivemStopped);
+            Process.Start($"{ServerURL}{LaunchEndpoint}?steamid={_steamHex}");
+            
+            _timerFivemOpenControl.Start();
         }
 
-        private void FivemStopped(Task task)
+        private void FivemStopped()
         {
-            if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(delegate { FivemStopped(null); }); return; }
+            if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(FivemStopped); return; }
 
-            var status = LauncherAPIManager.SetStatus(ServerUpdateURL, _steamHex, "0");
+            // ReSharper disable once UnusedVariable
+            var status = LauncherAPIManager.SetStatus($"{ServerURL}{StatusUpdateEndpoint}", _steamHex, "0");
 
             BtnLaunch.IsEnabled = true;
             Visibility = Visibility.Visible;
             Focus();
 
+            _timerFivemOpenControl.Stop();
+            _timerFivemCloseControl.Stop();
             _timerCheats.Stop();
             _timerCheats.Interval = new TimeSpan(0, 0, 0, 60);
             _timerCheats.Start();
@@ -539,8 +558,21 @@ namespace Launcher
                 }
             }
 
-            var status = LauncherAPIManager.SetStatus(ServerUpdateURL, _steamHex, "0");
+            // ReSharper disable once UnusedVariable
+            var status = LauncherAPIManager.SetStatus($"{ServerURL}{StatusUpdateEndpoint}", _steamHex, "0");
             FivemManager.KillFivem();
+        }
+
+        private void BtnClearCache_Click(object sender, RoutedEventArgs e)
+        {
+            FivemManager.ClearFivemCache(); // Fivem cache temizle
+
+            MessageBox.Show("FiveM önbelleği temizlendi.", MessageTitle, MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void BtnCopyMapFiles_Click(object sender, RoutedEventArgs e)
+        {
+            Copy3DMapFiles(); // 3D haritayı fivem klasörüne kopyala
         }
     }
 }
