@@ -1,4 +1,6 @@
 <?php
+session_start();
+
 $steam_api_key  = ""; // Steam Dev. API key yazınız
 
 // Veritabani ile ilgili bilgiler
@@ -6,6 +8,7 @@ $db_addr = "127.0.0.1"; // mysql server adresi
 $db_user = "root"; // mysql kullanici adi
 $db_pass = ""; // mysql parolasi
 $db_name = "essentialmode"; // mysql veritabani adi
+$admin_pass = "102030"; // panele giriş şifresi
 
 // FiveM server ile ilgili bilgiler
 $use_whitelist = false; // Whitelist icin LauncherStatuses tablosunu kullanacaksaniz burayi true yapin
